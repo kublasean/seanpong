@@ -20,21 +20,26 @@ class player:
         self.vx = 0
         
 class ball:
-    def __init__(self, radius):
+    def __init__(self, radius, center):
         self.x = 0
         self.y = 0
-        self.vx = 0.5
+        self.vx = 0
         self.vy = 4
         self.r = radius
+        self.center = center
+    def reset(self):
+        self.x = self.center[0]
+        self.y = self.center[1]
+        self.vx = 0
+        self.vy = 4
 
 class game:
-    def __init__(self, bnds, frame_rate, b, p1, p2, center):
+    def __init__(self, bnds, frame_rate, b, p1, p2):
         self.bounds = bnds
         self.fr = frame_rate
         self.ball = b
         self.p1 = p1
         self.p2 = p2
-        self.center = center
         self.hit = False
 
 # p = a player
@@ -57,53 +62,44 @@ def hit_detect(p, b):
     dx = abs(p.x - b.x) - p.w/2.0 - b.r;
     if dx < thresh and dy < thresh:
         b.vy *= -1
-        b.vx += p.vx
+        b.vx += -.1*p.vx
         return True
     return False
 
 # b = ball
 # adjust score / b.vx if out-of-bounds
-def bounds_detect(b, bounds, score, center):
-    if b.x <= bounds.x[0] or b.x >= bounds.x[1]:
+def bounds_detect(b, bounds, score):
+    if b.x-b.r <= bounds.x[0] or b.x+b.r >= bounds.x[1]:
         b.vx *= -1
     if b.y > bounds.y[1]:
         score[1] += 1
-        b.x = center[0]
-        b.y = center[1]
-        b.vy = 4
-        b.vx = 0.5
+        b.reset()
     if b.y < bounds.y[0]:
         score[0] += 1
-        b.x = center[0]
-        b.y = center[1]
-        b.vy = 4
-        b.vx = 0.5
+        b.reset()
 
-# s = state (dict to be sent to clients)
 def game_init(s):
     s['score'] = [0,0]
     s['time'] = 0
-    b = ball(25)
+    b = ball(25, (300, 200))
     p1 = player(100, 10, 400)
     p2 = player(100, 10, 0)
     bnds = bounds((0, 600), (0, 400))
-    g = game(bnds, 30, b, p1, p2, (300, 200))
-    g.ball.x = g.center[0]
-    g.ball.y = g.center[1]
+    g = game(bnds, 40, b, p1, p2)
+    g.ball.reset()
     while True:
         event_loop(s,g)
     return True
 
 # s = state, g = internal game state
 def event_loop(s, g):
-    print("event loop")
     time.sleep(1.0 / g.fr)
     
     update_player(g.p1, s['pos'][0][0])
     update_player(g.p2, s['pos'][1][0])
     update_ball(g.ball)
     
-    bounds_detect(g.ball, g.bounds, s['score'], g.center)
+    bounds_detect(g.ball, g.bounds, s['score'])
     
     hit_detect(g.p1, g.ball)
     hit_detect(g.p2, g.ball)
@@ -111,4 +107,6 @@ def event_loop(s, g):
     s['time'] += 1.0 / g.fr
     s['ball'] = [g.ball.x, g.ball.y]
     return True
-    
+   
+#s = {'pos': [[0,0],[0,0]]}
+#game_init(s)

@@ -27,16 +27,28 @@ var ball = {
 	}
 }
 
-function paddle(h, w, y) {
+function paddle(h, w, y, scorex, scorey) {
 	this.width = w;
 	this.height = h;
-	this.x = 0;
+	this.x = scorex;
     this.y = y;
+    this.score = { x: scorex, y: scorey, value: 0};
 }
 
 paddle.prototype.draw = 
 function() {
-	ctx.save();
+    //draw score
+    ctx.save();
+    ctx.font = '50px Consolas';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.translate(this.score.x, this.score.y);
+    ctx.fillStyle = 'rgba(0, 0, 0, 1.0)';
+    ctx.fillText(this.score.value, 0, 0);
+    ctx.restore();
+	
+    //draw paddle
+    ctx.save();
 	ctx.fillStyle = 'rgba(0, 0, 0, 1.0)';
     ctx.translate(this.x-this.width/2., this.y);
 	ctx.fillRect(0, 0, this.width, this.height);
@@ -62,10 +74,10 @@ function main(uri) {
 	
 	adjustVerticalCentering(document.getElementsByClassName('canvas-container')[0], document.body.clientHeight, canvas.height);
 	
-	player1 = new paddle(10, 100, canvas.height-10);
-	player2 = new paddle(10, 100, 0);
+	player1 = new paddle(10, 100, canvas.height-10, canvas.width/2., canvas.height-60);
+    player2 = new paddle(10, 100, 0, canvas.width/2., 60);
 	websocket = new WebSocket(uri);
-	
+	console.log(player1);
     //async handlers
 	websocket.onopen = function (evt) {
 		console.log("connection established");
@@ -74,7 +86,9 @@ function main(uri) {
 	websocket.onmessage = function (evt) {
 		let msg = JSON.parse(evt.data);
         player1.x = msg['pos'][0][0];
+        player1.score.value = msg['score'][0];
         player2.x = msg['pos'][1][0];
+        player2.score.value = msg['score'][1];
         ball.x = msg['ball'][0];
         ball.y = msg['ball'][1];
         console.log(msg);
