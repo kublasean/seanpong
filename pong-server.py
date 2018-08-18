@@ -14,10 +14,11 @@ MAX_GAMES = 20
 SESSIONS = queue.Queue()
 ACTIVE_GAMES = 0
 GAME_ID = 0
+FRAMERATE = 40
 
 class session:
     def __init__(self):
-        self.STATE = {'time': 0, 'pos': [[0,0],[0,0]], 'score': [0,0], 'ball': [300, 200]}
+        self.STATE = {'time': 0, 'pos': [[0,0],[0,0]], 'score': [0,0], 'ball': [300, 200], 'continue': True}
         self.players = {}
 
 async def register(user):
@@ -44,7 +45,7 @@ async def register(user):
         SESSIONS.put(s)
     output = " numplayers: " + repr(len(s.players)) + "\n"
     output += "active games: " + repr(ACTIVE_GAMES)
-    #print(output)
+    print(output)
     return True
 
 def consume(user, message):
@@ -62,7 +63,7 @@ async def consumer_handler(websocket):
         consume(websocket, message)
 
 async def produce(user):
-    await asyncio.sleep(1.0/30.0)
+    await asyncio.sleep(1.0/FRAMERATE)
     return json.dumps(USERS[user].STATE)
 
 async def producer_handler(websocket):
@@ -82,19 +83,20 @@ async def main(websocket, path):
         done, pending = await asyncio.wait([consumer_task, producer_task], return_when=asyncio.FIRST_COMPLETED)
         #disconnect logic
         s = USERS[websocket]                 # = session for this user
-        output = "disconnect: "
+        output = "disconnect: " + repr(websocket) + " " 
         for task in pending:
             task.cancel()
         
         USERS.pop(websocket)                #remove this client from users dict
         s.players.pop(websocket)             #remove this client from session.players dict
         other_players = list(s.players.keys());
-        
+        s.STATE['continue'] = False
+
         if s in FUTURES:
-            FUTURES[s].cancel()                        #kill thread 
-            FUTURES.pop(s);
+            output += repr(FUTURES[s].result())
+            FUTURES.pop(s)
             ACTIVE_GAMES -= 1
-            output += "killing thread " 
+            output += " thread result " 
                 
         if other_players:
             p = other_players[0]
@@ -104,7 +106,7 @@ async def main(websocket, path):
                 USERS[p] = snext
                 FUTURES[snext] = ( EXECUTOR.submit(pong.game_init, snext.STATE) ) #start new game
                 ACTIVE_GAMES += 1
-                output += "added other player to " + repr(GAME_ID) + " "
+                output += "added other player to " + repr(snext) + " "
             else:
                 s.players[p] = 0                   #set the player number of other player to one if present
                 SESSIONS.put(s)                  #put the old session with other player on waiting queue
@@ -112,7 +114,7 @@ async def main(websocket, path):
         else:
             output += "no other player "
         output += "active games: " + repr(ACTIVE_GAMES)
-        #print(output)
+        print(output)
     
 SESSIONS.put(session())
 with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_GAMES) as EXECUTOR:

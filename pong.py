@@ -40,7 +40,7 @@ class game:
         self.ball = b
         self.p1 = p1
         self.p2 = p2
-        self.hit = False
+        self.hit = 1
 
 # p = a player
 #  calcs x vel using previous position
@@ -73,22 +73,32 @@ def bounds_detect(b, bounds, score):
         b.vx *= -1
     if b.y > bounds.y[1]:
         score[1] += 1
-        b.reset()
+        return True
     if b.y < bounds.y[0]:
         score[0] += 1
-        b.reset()
+        return True
+    return False
 
+# g = game state
+# reset stuff for next round (called when p scores)
+def next_round(g):
+    g.ball.reset()
+    g.hit = 1
+
+# s = state
 def game_init(s):
     s['score'] = [0,0]
     s['time'] = 0
+    s['continue'] = True
     b = ball(25, (300, 200))
     p1 = player(100, 10, 400)
     p2 = player(100, 10, 0)
     bnds = bounds((0, 600), (0, 400))
     g = game(bnds, 40, b, p1, p2)
     g.ball.reset()
-    while True:
+    while s['continue']:
         event_loop(s,g)
+    print("thread graceful death")
     return True
 
 # s = state, g = internal game state
@@ -99,10 +109,17 @@ def event_loop(s, g):
     update_player(g.p2, s['pos'][1][0])
     update_ball(g.ball)
     
-    bounds_detect(g.ball, g.bounds, s['score'])
     
-    hit_detect(g.p1, g.ball)
-    hit_detect(g.p2, g.ball)
+    if bounds_detect(g.ball, g.bounds, s['score']):
+        next_round(g)
+        return True
+    
+    if g.hit == 1:
+        if hit_detect(g.p1, g.ball):
+            g.hit = 0
+    else:
+        if hit_detect(g.p2, g.ball):
+            g.hit = 1
    
     s['time'] += 1.0 / g.fr
     s['ball'] = [g.ball.x, g.ball.y]
